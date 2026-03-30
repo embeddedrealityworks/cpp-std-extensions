@@ -9,7 +9,7 @@ project(
 )
 
 fmt_sub = subproject('fmt')
-fmt_dep = fmt_sub.get_variable('fmt_dep')
+fmt_dep = fmt_sub.get_variable('fmt_header_only_dep')
 mp11_sub = subprojet('mp11')
 mp11_dep = mp11_sub.get_variable('mp11_dep')
 concurrency_sub = subproject('cpp-baremetal-concurrency', default_options: ['simulate_freestanding=true'])
