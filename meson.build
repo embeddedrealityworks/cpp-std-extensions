@@ -7,7 +7,7 @@ project(
     default_options: ['cpp_std=c++23'],
 )
 
-fmt_sub = subproject('fmt')
+fmt_sub = subproject('fmt', default_options: ['fmt_tests=false'])
 fmt_dep = fmt_sub.get_variable('fmt_header_only_dep')
 mp11_sub = subproject('mp11')
 mp11_dep = mp11_sub.get_variable('mp11_dep')
