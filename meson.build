@@ -3,7 +3,6 @@ project(
     'cpp',
     version: '0.1.0',
     license: 'BSL-1.0',
-    description: 'A header-only C++ library that polyfills the standard library.',
     meson_version: '>=1.1.0',
     default_options: ['cpp_std=c++23'],
 )
