@@ -7,6 +7,12 @@ project(
     default_options: ['cpp_std=c++23'],
 )
 
+if meson.get_compiler('cpp').get_id() == 'clang'
+  cppargs = ['-Wno-missing-braces']
+else
+  cppargs = []
+endif
+
 fmt_sub = subproject('fmt', default_options: ['fmt_tests=false', 'fmt_header_only=true'])
 fmt_dep = fmt_sub.get_variable('fmt_header_only_dep')
 mp11_sub = subproject('mp11')
@@ -19,6 +25,7 @@ stdx_inc = include_directories('include')
 stdx_dep = declare_dependency(
     include_directories: stdx_inc,
     dependencies: [fmt_dep, mp11_dep, concurrency_dep],
+    compile_args: cppargs
 )
 
 install_headers(
