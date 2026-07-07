@@ -205,8 +205,8 @@ template <typename T, typename... Ts> constexpr auto try_construct() -> T {
 }
 
 template <typename T> struct any_t {
-    // NOLINTNEXTLINE(modernize-use-constraints)
-    template <typename U, std::enable_if_t<not std::is_same_v<T, U>, int> = 0>
+    template <typename U>
+        requires(not std::is_same_v<T, U>)
     // NOLINTNEXTLINE(google-explicit-constructor)
     constexpr operator U() {
         return try_construct<U>();
@@ -300,10 +300,10 @@ STDX_PRAGMA(diagnostic ignored "-Wc++26-extensions")
 #endif
 template <unsigned int N, typename... Ts>
 using nth_t =
-#if __cpp_pack_indexing >= 202311L
-    Ts...[N];
-#elif __has_builtin(__type_pack_element)
+#if __has_builtin(__type_pack_element)
     __type_pack_element<N, Ts...>;
+#elif __cpp_pack_indexing >= 202311L
+    Ts...[N];
 #else
     boost::mp11::mp_at_c<type_list<Ts...>, N>;
 #endif

@@ -44,17 +44,15 @@ concept envlike = is_specialization_of_v<T, env>;
 
 namespace _env {
 template <typename T> struct autowrap {
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    consteval autowrap(T t) : value(t) {}
+    consteval explicit(false) autowrap(T t) : value(t) {}
     T value;
 };
 
-// NOLINTNEXTLINE(modernize-avoid-c-arrays)
+// NOLINTNEXTLINE(*-avoid-c-arrays)
 template <std::size_t N> using str_lit_t = char const (&)[N];
 
 template <std::size_t N> struct autowrap<str_lit_t<N>> {
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    consteval autowrap(str_lit_t<N> str) : value(str) {}
+    consteval explicit(false) autowrap(str_lit_t<N> str) : value(str) {}
     stdx::ct_string<N> value;
 };
 
