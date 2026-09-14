@@ -22,6 +22,8 @@ platform.
 * `size` does the same as `count()`: `capacity()` is the static size
 * `empty` (size == 0) is provided
 * `clear` does the same as `reset`
+* The single-argument constructor (from `std::uint64_t`) is `explicit`. There is
+  also an assignment operator from `std::uint64_t`.
 
 A bitset has two template parameters: the size of the bitset and the storage
 element type to use. The storage element type must be unsigned.
@@ -53,16 +55,6 @@ Or by specifying which bits are set and using `stdx::place_bits`:
 [source,cpp]
 ----
 auto bs = stdx::bitset<8>{stdx::place_bits, 2, 3}; // bits 2 and 3 set
-----
-
-Or with a string_view (potentially by substring and with a known value for
-set bits):
-[source,cpp]
-----
-using namespace std::string_view_literals;
-auto bs1 = stdx::bitset<8>{"1100"sv};            // bits 2 and 3 set
-auto bs2 = stdx::bitset<8>{"1100"sv, 0, 2};      // bits 0 and 1 set
-auto bs3 = stdx::bitset<8>{"AABB"sv, 0, 2, 'A'}; // bits 0 and 1 set
 ----
 
 To convert a bitset back to an integral type, `to<T>` is available where `T` is
