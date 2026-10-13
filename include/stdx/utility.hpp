@@ -24,9 +24,21 @@ template <typename... Fs> overload(Fs...) -> overload<Fs...>;
 [[noreturn]] inline auto unreachable() -> void { __builtin_unreachable(); }
 
 namespace detail {
-template <auto V> struct value_t {
-    constexpr static inline auto value = V;
+template <typename T> struct map_value_helper {
+    consteval explicit(false) map_value_helper(auto t) : value(t) {}
+
+    T value;
 };
+template <typename T> map_value_helper(T) -> map_value_helper<T>;
+
+template <map_value_helper V> struct map_value_t {
+    constexpr static inline auto value = V.value;
+};
+
+template <typename T> consteval auto unwrap_map_value(T t) -> T { return t; }
+template <map_value_helper V> consteval auto unwrap_map_value(map_value_t<V>) {
+    return V.value;
+}
 
 template <typename... Ts> struct type_map : Ts... {};
 } // namespace detail
@@ -38,12 +50,12 @@ template <typename K, typename V> struct type_pair {
     using value_type = V;
 };
 template <typename K, typename V> using tt_pair = type_pair<K, V>;
-template <auto K, typename V> using vt_pair = tt_pair<detail::value_t<K>, V>;
-template <typename K, auto V> using tv_pair = tt_pair<K, detail::value_t<V>>;
-template <auto K, auto V>
-using vv_pair = tt_pair<detail::value_t<K>, detail::value_t<V>>;
-
-template <typename... Ts> using type_map = shrink_t<detail::type_map<Ts...>>;
+template <detail::map_value_helper K, typename V>
+using vt_pair = tt_pair<detail::map_value_t<K>, V>;
+template <typename K, detail::map_value_helper V>
+using tv_pair = tt_pair<K, detail::map_value_t<V>>;
+template <detail::map_value_helper K, detail::map_value_helper V>
+using vv_pair = tt_pair<detail::map_value_t<K>, detail::map_value_t<V>>;
 
 namespace detail {
 template <typename K, typename Default>
@@ -57,50 +69,90 @@ template <typename V, typename Default, typename K>
 constexpr static auto reverse_lookup(type_pair<K, V>) -> K;
 } // namespace detail
 
-template <typename M, typename K, typename Default = void>
+struct missing_t {
+    friend constexpr auto operator==(missing_t const &, missing_t const &)
+        -> bool = default;
+};
+constexpr inline auto missing = missing_t{};
+
+template <typename M, typename K, typename Default = missing_t>
 using type_lookup_t = decltype(detail::lookup<K, Default>(expand<M>()));
 
-template <typename M, typename V, typename Default = void>
+template <typename M, typename V, typename Default = missing_t>
 using reverse_type_lookup_t =
     decltype(detail::reverse_lookup<V, Default>(expand<M>()));
 
-template <typename M, auto K, typename Default = void>
+template <typename M, detail::map_value_helper K, typename Default = missing_t>
 using value_lookup_t =
-    decltype(detail::lookup<detail::value_t<K>, Default>(expand<M>()));
+    decltype(detail::lookup<detail::map_value_t<K>, Default>(expand<M>()));
 
-template <typename M, auto V, typename Default = void>
+template <typename M, detail::map_value_helper V, typename Default = missing_t>
 using reverse_value_lookup_t =
-    decltype(detail::reverse_lookup<detail::value_t<V>, Default>(expand<M>()));
+    decltype(detail::reverse_lookup<detail::map_value_t<V>, Default>(
+        expand<M>()));
 
 namespace detail {
 template <typename T>
-using is_not_void = std::bool_constant<not std::is_void_v<T>>;
+using is_present = std::bool_constant<not std::same_as<T, missing_t>>;
 }
 
-template <typename M, typename K, auto Default = 0>
+template <typename M, typename K, detail::map_value_helper Default = missing>
 constexpr static auto type_lookup_v =
-    type_or_t<detail::is_not_void,
-              decltype(detail::lookup<K, void>(expand<M>())),
-              detail::value_t<Default>>::value;
+    type_or_t<detail::is_present,
+              decltype(detail::lookup<K, missing_t>(expand<M>())),
+              detail::map_value_t<Default>>::value;
 
-template <typename M, typename V, auto Default = 0>
+template <typename M, typename V, detail::map_value_helper Default = missing>
 constexpr static auto reverse_type_lookup_v =
-    type_or_t<detail::is_not_void,
-              decltype(detail::reverse_lookup<V, void>(expand<M>())),
-              detail::value_t<Default>>::value;
+    type_or_t<detail::is_present,
+              decltype(detail::reverse_lookup<V, missing_t>(expand<M>())),
+              detail::map_value_t<Default>>::value;
 
-template <typename M, auto K, auto Default = 0>
+template <typename M, detail::map_value_helper K,
+          detail::map_value_helper Default = missing>
 constexpr static auto value_lookup_v =
-    type_or_t<detail::is_not_void,
-              decltype(detail::lookup<detail::value_t<K>, void>(expand<M>())),
-              detail::value_t<Default>>::value;
-
-template <typename M, auto V, auto Default = 0>
-constexpr static auto reverse_value_lookup_v =
-    type_or_t<detail::is_not_void,
-              decltype(detail::reverse_lookup<detail::value_t<V>, void>(
+    type_or_t<detail::is_present,
+              decltype(detail::lookup<detail::map_value_t<K>, missing_t>(
                   expand<M>())),
-              detail::value_t<Default>>::value;
+              detail::map_value_t<Default>>::value;
+
+template <typename M, detail::map_value_helper V,
+          detail::map_value_helper Default = missing>
+constexpr static auto reverse_value_lookup_v =
+    type_or_t<detail::is_present,
+              decltype(detail::reverse_lookup<detail::map_value_t<V>,
+                                              missing_t>(expand<M>())),
+              detail::map_value_t<Default>>::value;
+
+template <typename... Ts>
+class type_map : public shrink_t<detail::type_map<Ts...>> {
+    using map_t = shrink_t<detail::type_map<Ts...>>;
+
+    template <typename K> consteval static auto try_lookup() {
+        using V = type_lookup_t<map_t, K>;
+        if constexpr (requires { V{}; }) {
+            return detail::unwrap_map_value(V{});
+        } else {
+            return type_identity_v<V>;
+        }
+    }
+
+  public:
+    template <typename K> consteval auto operator[](K) const {
+        if constexpr (not same_as<decltype(try_lookup<K>()), missing_t>) {
+            return try_lookup<K>();
+        } else if constexpr (requires { typename K::type; }) {
+            return try_lookup<typename K::type>();
+        } else {
+            return missing;
+        }
+    }
+
+    template <typename K> consteval auto operator()(K) const {
+        return this->operator[](
+            detail::map_value_t<detail::map_value_helper{K::value}>{});
+    }
+};
 
 template <typename T, typename U>
 [[nodiscard]] constexpr auto forward_like(U &&u) noexcept -> decltype(auto) {
